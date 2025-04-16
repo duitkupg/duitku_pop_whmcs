@@ -101,6 +101,15 @@ function duitkupop_link($params)
   $moduleDisplayName = $params['name'];
   $moduleName = $params['paymentmethod'];
   $whmcsVersion = $params['whmcsVersion'];
+	$description = $params['description'];
+	
+	$ProducItem = array(
+		'name' => $description,
+		'price' => (int)ceil($amount),
+		'quantity' => 1
+	);
+	
+	$item_details = array($ProducItem);
 
   //$signature = md5($merchantcode.(string)$orderid.(int)$amount.$apikey);
 
@@ -109,7 +118,10 @@ function duitkupop_link($params)
     "merchantUserInfo" => $email,
     "paymentAmount" => (int)ceil($amount),
     "productDetails" => $description,
+    "merchantUserInfo"=> $email,
+    "customerVaName"=> $firstname . " " . $lastname,
     "additionalParam" => "",
+    "itemDetails" => $item_details,
     "email" => $email,
     "phoneNumber" => $phone,
     "returnUrl" => $systemUrl . "/modules/gateways/callback/duitkupop_return.php",

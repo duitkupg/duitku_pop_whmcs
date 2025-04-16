@@ -78,6 +78,7 @@ if (extension_loaded('curl')) {
 	echo "Duitku callback invalid";
 	exit;
 }
+checkCbTransID($respond->reference);
 
 if ($respond->statusCode == '00') {
 	addInvoicePayment(

@@ -1,0 +1,37 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-gateways",
+    "name": "duitkupop",
+    "license": "MIT",
+    "category": "payments",
+    "description": {
+        "name": "Duitku Pop Payment Gateway Module",
+        "tagline": "Indonesia Payment Gateways💸",
+        "long": "Duitku Pop WHMCS is an integration that supports the WHMCS platform so that customers can make payments online. Duitku Pop payments provide a pop-up feature that allows users to checkout without having to exit the WHMCS. Duitku Pop is one integration for all available payment method options.",
+        "features": [
+			"QRIS",
+			"EWALLET",
+			"PayLater",
+			"Virtual Account",
+			"Credit Card",
+			"Retail",
+            "Pop Up payment"
+        ]
+    },
+    "logo": {
+        "filename": "logo.jpg"
+    },
+    "support": {
+        "homepage": "https:\/\/www.duitku.com\/", 
+        "learn_more": "https:\/\/docs.duitku.com", 
+        "email": "support@duitku.com", 
+        "support_url": "https:\/\/dashboard.duitku.com",
+        "docs_url": "https:\/\/docs.duitku.com\/payment-gateway\/plugin\/"
+    },
+    "authors": [
+        {
+            "name": "Duitku",
+            "homepage": "https:\/\/duitku.com"
+        }
+    ]
+}
