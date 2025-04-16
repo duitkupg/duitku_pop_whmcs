@@ -1,0 +1,27 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-gateways",
+    "name": "duitkupop",
+    "license": "MIT",
+    "category": "gateway",
+    "description": {
+        "name": "Duitku Pop Payment Gateway Module",
+        "tagline": "Our payment gateway is designed with Indonesian market in mind to provide you.",
+    },
+    "logo": {
+        "filename": "logo.png"
+    },
+    "support": {
+        "homepage": "https:\/\/www.duitku.com\/", 
+        "learn_more": "https:\/\/www.duitku.com\/tour", 
+        "email": "support@duitku.com", 
+        "support_url": "https:\/\/dashboard.duitku.com\/",
+        "docs_url": "https:\/\/docs.duitku.com\/payment-gateways\/plugin"
+    },
+    "authors": [
+        {
+            "name": "Duitku",
+            "homepage": "https:\/\/www.duitku.com\/"
+        }
+    ]
+}

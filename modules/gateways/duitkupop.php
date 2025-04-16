@@ -55,13 +55,6 @@ function duitkupop_config()
       'Default' => '',
       'Description' => '<br>Input your API key. Get api key at duitku.com',
     ),
-    'endpoint' => array(
-      'FriendlyName' => 'URL Endpoint',
-      'Type' => 'text',
-      'Size' => '100',
-      'Default' => '',
-      'Description' => '<br>Input URL endpoint Duitku payment',
-    ),
   );
 }
 
@@ -76,14 +69,15 @@ function duitkupop_link($params)
   $pluginVersion = '1.0';
   $merchantcode = $params['merchantcode'];
   $apikey = $params['apikey'];
-  $endpoint = $params['endpoint'];
   $pluginstatus = $params['pluginstatus'];
   $uimode = $params['uimode'];
 
   if ($pluginstatus == "sandbox") {
     $urllib = 'https://app-sandbox.duitku.com/lib/js/duitku.js';
+    $endpoint = 'https://api-sandbox.duitku.com';
   } elseif ($pluginstatus == "production") {
     $urllib = 'https://app-prod.duitku.com/lib/js/duitku.js';
+    $endpoint = 'https://api-prod.duitku.com';
   }
 
   $orderid = $params['invoiceid'];
@@ -113,13 +107,13 @@ function duitkupop_link($params)
   $params = array(
     "merchantOrderId" => (string)$orderid,
     "merchantUserInfo" => $email,
-    "paymentAmount" => (int)$amount,
+    "paymentAmount" => (int)ceil($amount),
     "productDetails" => $description,
     "additionalParam" => "",
     "email" => $email,
     "phoneNumber" => $phone,
-    "returnUrl" => $systemUrl . "/modules/gateways/callback/duitku_return.php",
-    "callbackUrl" => $systemUrl . "/modules/gateways/callback/duitku_return.php",
+    "returnUrl" => $systemUrl . "/modules/gateways/callback/duitkupop_return.php",
+    "callbackUrl" => $systemUrl . "/modules/gateways/callback/duitkupop_callback.php",
   );
 
   $customerdetail = array(
@@ -169,6 +163,7 @@ function duitkupop_link($params)
       }
       curl_close($ch);
       $respond = json_decode($server_output);
+      logModuleCall("duitkupop", "Create Invoice", json_encode($params), $server_output, json_encode($respond), array());
 
       if ($respond->statusCode == '00') {
         if ($uimode == 'popup') {
@@ -177,7 +172,7 @@ function duitkupop_link($params)
           redirect_payment($respond->paymentUrl);
         }
       } else {
-        $messages = $server_output;
+        $messages = json_encode($server_output);
       }
     } catch (Exception $e) {
       echo $e->getMessage();
@@ -192,21 +187,48 @@ function duitkupop_link($params)
   $html2 .= '<a id="later" class="btn btn-info" href="" class="button">Continue shopping</a>
   <script type="text/javascript">
         var baseUrl = window.location.origin+window.location.pathname;
-        var message = "' . $messages . '";
+        var message = ' . strval($messages) . ';
 
         document.getElementById("later").href = baseUrl;
-  	document.querySelector("[class*=\"alert alert-info text-center\"]").innerText = message === "Minimum Payment 10000" ? "Duitku payment message : Minimum Payment Rp.10000, Your payment amount is Rp.' . $amount . '" : message;
-	document.querySelector(\'[alt*="Loading"]\').style.display = "none";
+        
+        var loc = window.location.href;
+        var checkLoc = loc.lastIndexOf("viewinvoice");
+        if (checkLoc >= 0) {
+          document.getElementById("later").style.cssText = "display:none";
+          var invoice_container = document.querySelector("[class*=\"container-fluid invoice-container\"]");
+          var generatePanel = document.createElement("div");
+          generatePanel.className = "panel panel-info";
+          var generatePanelHeading = document.createElement("div");
+          generatePanelHeading.className = "panel-heading";
+          var generatePanelTitle = document.createElement("h3");
+          generatePanelTitle.className = "panel-title";
+          var generateTitleText = document.createElement("strong");
+          generateTitleText.innerText = "Awaiting Payment";
+          var generatePanelBody = document.createElement("div");
+          generatePanelBody.className = "panel-body text-center";
+          generatePanelBody.innerText = "Please complete your payment as instructed before. Check your email for instruction. Thank You!";
+          generatePanelTitle.appendChild(generateTitleText);
+          generatePanelHeading.appendChild(generatePanelTitle);
+          generatePanel.appendChild(generatePanelHeading);
+          generatePanel.appendChild(generatePanelBody);
+          invoice_container.appendChild(generatePanel);
+        }else{
+          document.querySelector("[class*=\"alert alert-info text-center\"]").innerText = message === "Minimum Payment 10000" ? "Duitku payment message : Minimum Payment Rp.10000, Your payment amount is Rp.' . $amount . '" : message;
+          document.querySelector(\'[alt*="Loading"]\').style.display = "none";
+        }
   </script>';
   // $html .= '<pre>' . var_export($respond, true) . '</pre>';
   // $html .= '<pre>' . var_export($params, true) . '</pre>';
   // $html .= '<pre>' . var_export($url, true) . '</pre>';
+  $html .= '<label id="label-status" style="display:none"></label>';
   $html .= '<button id="checkout-button">Loading...</button>
   <script src="' . $urllib . '"></script>
   <script type="text/javascript">
   var loc = window.location.href;
   var checkLoc = loc.lastIndexOf("viewinvoice");
   var checkoutButton = document.getElementById("checkout-button");
+  var labelStatus = document.getElementById("label-status");
+  //var breakLine = document.getElementById("break-line");
 
   var libraryDuitkuCheckoutExecute = false;
   var libraryDuitkuCheckout = function(event) {
@@ -238,22 +260,43 @@ function duitkupop_link($params)
           checkout.process(REFERENCE_NUMBER, {
             successEvent: function(result){
               checkoutButton.className = "btn btn-success";
-              checkoutButton.innerHTML = "Payment Success...";
+              labelStatus.innerHTML = "Payment Success...";
+              labelStatus.style.cssText = "display:block";
+              setTimeout(() => {
+                labelStatus.innerHTML = "";
+                labelStatus.style.cssText = "display:none";
+              }, 5000);
+              //breakLine.style.cssText = "display:block";
+              //checkoutButton.innerHTML = "Payment Success...";
               window.location = "' . $params["returnUrl"] . '" + "?merchantOrderId=" + result.merchantOrderId + "&resultCode=" + result.resultCode + "&reference=" + result.reference;
             },
             pendingEvent: function(result){
-              checkoutButton.className = "btn btn-warning";
-              checkoutButton.innerHTML = "Payment Pending...";
+              //checkoutButton.className = "btn btn-warning";
+              labelStatus.innerHTML = "Payment Pending...";
+              labelStatus.style.cssText = "display:block";
+              setTimeout(() => {
+                labelStatus.innerHTML = "";
+                labelStatus.style.cssText = "display:none";
+              }, 5000);
+              //breakLine.style.cssText = "display:block";
+              //checkoutButton.innerHTML = "Payment Pending...";
               window.location = "' . $params["returnUrl"] . '" + "?merchantOrderId=" + result.merchantOrderId + "&resultCode=" + result.resultCode + "&reference=" + result.reference;
             },
             errorEvent: function(result){
-              checkoutButton.className = "btn btn-danger";
+              //checkoutButton.className = "btn btn-danger";
               checkoutButton.innerHTML = "Re-Checkout";
               document.querySelector("[class*=\"alert alert-info text-center\"]").innerText = "We noticed a problem with your order. Please do re-checkout. If you think this is an error, feel free to contact our expert customer support team.";
             },
             closeEvent: function(result){
-              checkoutButton.className = "btn btn-default";
-              checkoutButton.innerHTML = "Payment Close";
+              //checkoutButton.className = "btn btn-default";
+              //checkoutButton.innerHTML = "Payment Close";
+              labelStatus.innerHTML = "Payment Close";
+              labelStatus.style.cssText = "display:block";
+              setTimeout(() => {
+                labelStatus.innerHTML = "";
+                labelStatus.style.cssText = "display:none";
+              }, 5000);
+              //breakLine.style.cssText = "display:block";
             }
           });
           checkoutExecuted = true;
@@ -273,16 +316,25 @@ function duitkupop_link($params)
     var clickCount = 0;
     checkoutButton.className = "btn btn-success";
     checkoutButton.innerHTML = "Proceed to Payment";
+    labelStatus.innerHTML = "";
+    labelStatus.style.cssText = "display:none";
+    //breakLine.style.cssText = "display:none";
 
     checkoutButton.onclick = function(){
       if (clickCount >= 2) {
         location.reload();
         checkoutButton.className = "btn btn-info";
         checkoutButton.innerHTML = "Reloading...";
+        labelStatus.innerHTML = "";
+        labelStatus.style.cssText = "display:none";
+        //breakLine.style.cssText = "display:none";
         return;
       }
       checkoutButton.className = "btn btn-success";
       checkoutButton.innerHTML = "Proceed to Payment";
+      labelStatus.innerHTML = "";
+      labelStatus.style.cssText = "display:none";
+      //breakLine.style.cssText = "display:none";
       executeCheckout();
       clickCount++;
     };
@@ -304,7 +356,8 @@ function duitkupop_link($params)
     document.addEventListener("DOMContentLoaded", libraryDuitkuCheckout);
     setTimeout(function(){ console.log("Running Duitku Payment"); libraryDuitkuCheckout(null); }, 30000);
   }else{
-    checkoutButton.style.cssText = "display:none";
+    document.addEventListener("DOMContentLoaded", libraryDuitkuCheckout);
+    //checkoutButton.style.cssText = "display:none";
     if (getParameterByName("paymentsuccess") !== "true") {
       var invoice_container = document.querySelector("[class*=\"container-fluid invoice-container\"]");
       var generatePanel = document.createElement("div");
