@@ -238,6 +238,9 @@ function duitkupop_link($params)
   <script type="text/javascript">
   var loc = window.location.href;
   var checkLoc = loc.lastIndexOf("viewinvoice");
+  
+  var checkLocComplete = loc.indexOf("a=complete") > -1;
+  
   var checkoutButton = document.getElementById("checkout-button");
   var labelStatus = document.getElementById("label-status");
   //var breakLine = document.getElementById("break-line");
@@ -351,7 +354,11 @@ function duitkupop_link($params)
       clickCount++;
     };
 
-    executeCheckout();
+    //executeCheckout();
+	
+	if (checkLocComplete) {
+      executeCheckout();
+    }
   };
 
   function getParameterByName(name, url) {
