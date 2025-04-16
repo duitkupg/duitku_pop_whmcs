@@ -6,50 +6,65 @@ $whmcs->load_function("invoice");
 
 $gatewayParams = getGatewayVariables('duitkupop');
 
-if (empty($_REQUEST['resultCode']) || empty($_REQUEST['merchantOrderId']) || empty($_REQUEST['reference'])) {
-	error_log('wrong query string please contact admin.');
-	logActivity('duitku plugin error: wrong query string please contact admin.', 0);
-	echo "duitku plugin error: wrong query string please contact admin.";
+if (!$gatewayParams['type']) {
+	logTransaction('duitkupop', json_encode($_POST, JSON_PRETTY_PRINT), "Callback failed, Module duitkupop not active.");
+	header("HTTP/1.0 200 OK");
 	exit;
 }
 
+if (empty($_POST['resultCode']) || empty($_POST['merchantOrderId']) || empty($_POST['reference'])) {
+	logTransaction('duitkupop', json_encode($_POST, JSON_PRETTY_PRINT), "Callback failed, param resultCode, merchantOrderId, or reference is empty.");
+	header("HTTP/1.0 200 OK");
+	exit;
+}
+
+//prepare parameter for inquiry status
 $apikey = $gatewayParams['apikey'];
-$pluginstatus = $gatewayParams['pluginstatus'];
-$merchant_code = $gatewayParams['merchantcode'];
-if ($pluginstatus == "sandbox") {
+$environment = $gatewayParams['environment'];
+$merchantCode = $gatewayParams['merchantcode'];
+if ($environment == "sandbox") {
   $endpoint = 'https://api-sandbox.duitku.com';
-} elseif ($pluginstatus == "production") {
+} elseif ($environment == "production") {
   $endpoint = 'https://api-prod.duitku.com';
 }
-$order_id = stripslashes($_REQUEST['merchantOrderId']);
-$amount = stripslashes($_REQUEST['amount']);
-$status = stripslashes($_REQUEST['resultCode']);
-$reference = stripslashes($_REQUEST['reference']);
-$calSignature = stripslashes($_REQUEST['signature']);
+$orderId = stripslashes($_POST['merchantOrderId']);
+$amount = stripslashes($_POST['amount']);
+$status = stripslashes($_POST['resultCode']);
+$reference = stripslashes($_POST['reference']);
+$callbackSignature = stripslashes($_POST['signature']);
 
-$calStringSign = $merchant_code . $amount . $order_id . $apikey;
-$calSign = md5($calStringSign);
-
-if($calSignature !== $calSign){
-	$orgipn = "";
-	foreach ($_POST as $key => $value) {
-		$orgipn.= ("" . $key . " => " . $value . "\r\n");
-	}
-	logTransaction($gatewayModuleName, $orgipn, "Duitku Signature Invalid");
-	logActivity('duitku error: Callback Signature Invalid.', 0);
-	error_log('Callback Signature Invalid.');
-	echo "Duitku callback invalid";
+//validate incoming signature
+$validationSignature = md5($merchantCode . $amount . $orderId . $apikey);
+if($callbackSignature !== $validationSignature){
+	logTransaction("duitkupop", $callbackSignature . " not equal with " .  $validationSignature, "Duitku Callback Signature Invalid");
+	header("HTTP/1.0 200 OK");
 	exit;
 }
 
+//check current currency 
+$additionalParam = stripslashes($_POST['additionalParam']);
+$currencyCurrent = mysql_fetch_assoc(select_query('tblcurrencies', 'code, rate', array("code"=>$additionalParam)));
+if ($currencyCurrent['code'] != 'IDR'){
+	$currencyDefault = mysql_fetch_assoc(select_query('tblcurrencies', 'code, rate', array("id"=>'1')));
+	
+	//Check Default Currency
+	if ($currencyDefault['code'] != 'IDR'){
+		logTransaction("duitkupop", json_encode($currencyDefault, JSON_PRETTY_PRINT), "Callback failed, Default currency is not IDR.");
+		header("HTTP/1.0 200 OK");
+		exit;
+	}
+	
+	$amount = $amount * $currencyCurrent['rate'];
+}
+
+//check with duitku status
 $urlStat = $endpoint.'/api/merchant/transactionStatus';
-$signature = md5($merchant_code . $order_id . $apikey);
+$signature = md5($merchantCode . $orderId . $apikey);
 $params = array(
-	'merchantCode' => $merchant_code,
-	'merchantOrderId' => $order_id,
+	'merchantCode' => $merchantCode,
+	'merchantOrderId' => $orderId,
 	'signature' => $signature
 );
-
 if (extension_loaded('curl')) {
 	try{
 		$ch = curl_init();
@@ -64,20 +79,23 @@ if (extension_loaded('curl')) {
 		$server_output = curl_exec($ch);
 		curl_close ($ch);
 		$respond = json_decode($server_output);
-		logModuleCall("duitkupop", "Check Transaction", json_encode($params), $server_output, json_encode($respond), array());
+		logTransaction("duitkupop", json_encode($server_output, JSON_PRETTY_PRINT), "Check Transaction for order id " . $orderId);
+		logModuleCall("duitkupop", "Check Transaction for order id " . $orderId, json_encode($params, JSON_PRETTY_PRINT), json_encode($server_output, JSON_PRETTY_PRINT), json_encode($respond, JSON_PRETTY_PRINT), array());
 	}
 	catch (Exception $e) {
-		error_log($e->getMessage());
-		logModuleCall("duitkupop", "Check Transaction", json_encode($params), $e->getMessage(), json_encode($e), array());
-		echo "Duitku callback invalid";
+		logTransaction("duitkupop", $e->getMessage(), "Check Transaction for order id " . $orderId);
+		logModuleCall("duitkupop", "Check Transaction for order id " . $orderId, json_encode($params, JSON_PRETTY_PRINT), $e->getMessage(), json_encode($e, JSON_PRETTY_PRINT), array());
+		header("HTTP/1.0 200 OK");
 		exit;
 	}
 }else{
-	error_log('Duitku payment need curl extension, please enable curl extension in your web server.');
-	logActivity('Duitku payment need curl extension, please enable curl extension in your web server.', 0);
-	echo "Duitku callback invalid";
+	logTransaction("duitkupop", "Duitku payment need curl extension, please enable curl extension in your web server.", "Duitku Callback Signature Invalid");
+	logModuleCall("duitkupop", "Callback Transaction for " . strtoupper($reference), json_encode($_POST, JSON_PRETTY_PRINT), "WHMCS error with curl.", "");
+	header("HTTP/1.0 200 OK");
 	exit;
 }
+
+$invoiceId = checkCbInvoiceID($orderId, 'duitkupop');
 checkCbTransID($respond->reference);
 
 if ($respond->statusCode == '00') {
@@ -88,17 +106,12 @@ if ($respond->statusCode == '00') {
 		$respond->fee,
 		"duitkupop"
 	);
-	logActivity('duitku notification accepted: Payment success order ' . $respond->merchantOrderId . '.', 0);
-    echo "Payment success notification accepted";
+	logTransaction('duitkupop', json_encode($_POST, JSON_PRETTY_PRINT), "Callback finish, Payment success validated.");
+	logModuleCall('duitkupop', "Callback Transaction for " . strtoupper($reference), json_encode($_POST, JSON_PRETTY_PRINT), "Payment success notification accepted", "");
 }else {
-    $orgipn = "";
-	foreach ($_POST as $key => $value) {
-		$orgipn.= ("" . $key . " => " . $value . "\r\n");
-	}
-	logActivity('Duitku Handshake Invalid.', 0);
-	logTransaction($gatewayModuleName, $orgipn, "Duitku Handshake Invalid");
-	echo "Duitku Handshake Invalid";
-	header("HTTP/1.0 200 OK");
+	logTransaction('duitkupop', json_encode($_POST, JSON_PRETTY_PRINT), "Duitku Handshake Invalid");
+	logModuleCall('duitkupop', "Callback Transaction for " . strtoupper($reference), json_encode($_POST, JSON_PRETTY_PRINT), "Duitku Handshake Invalid", "");
 }
 
+header("HTTP/1.0 200 OK");
 die();
