@@ -146,24 +146,27 @@ $customerDetail = array(
 
 //items
 $itemDetails = array();
-if ($currency != 'IDR') {
-    foreach ($invoice['items']['item'] as $item) {
-        $itemDetails[] = array(
-            'name' => $item['description'],
-            'price' => (int)ceil($item['amount'] / $rate),//set value idr if not using idr
-            'quantity' => 1
-        );
-    }
-}else{
-    foreach ($invoice['items']['item'] as $item) {
-        $itemDetails[] = array(
-            'name' => $item['description'],
-            'price' => (int)ceil($item['amount']),
-            'quantity' => 1
-        );
-    }
+foreach ($invoice['items']['item'] as $item) {
+    $itemDetails[] = array(
+        'name' => $item['description'],
+        'price' => (int)ceil($item['amount'] / $rate),//set value idr if not using idr
+        'quantity' => 1
+    );
 }
-
+if ($invoice['tax'] != 0){
+    $itemDetails[] = array(
+        'name' => "Tax ".$invoice['taxrate']."%",
+        'price' => (int)ceil($invoice['tax'] / $rate),//set value idr if not using idr
+        'quantity' => 1
+    );
+}
+if ($invoice['tax2'] != 0){
+    $itemDetails[] = array(
+        'name' => "Tax 2 ".$invoice['taxrate2']."%",
+        'price' => (int)ceil($invoice['tax2'] / $rate),//set value idr if not using idr
+        'quantity' => 1
+    );
+}
 //params
 $payload = array(
     'paymentAmount' => $paymentAmount,
