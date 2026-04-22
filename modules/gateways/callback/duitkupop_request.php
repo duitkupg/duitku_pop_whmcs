@@ -47,7 +47,7 @@ $postData = array(
 $clientDetails = localAPI($command, $postData);
 
 //validate signature
-$signature = hash("sha256", $config['merchantcode'] . $clientId . $invoiceid . $data['description'] . $config['apikey']);
+$signature = hash_hmac("sha256", $config['merchantcode'] . $clientId . $invoiceid . $data['description'] , $config['apikey']);
 if($signature !== $data['signature']){
     logTransaction("Duitkupop", $signature . " not equal with " .  $data['signature'], "Failed before requesting to Duitku, invalid whmcs signature.");
 	logActivity("Failed before requesting to Duitku, invalid whmcs signature", $clientId);
@@ -102,7 +102,7 @@ $url = $endpoint . '/api/merchant/createInvoice';
 $merchantCode = $config['merchantcode'];
 $apikey = $config['apikey'];
 $timestamp = round(microtime(true) * 1000); //in milisecond
-$headerSignature = hash('sha256', $merchantCode . $timestamp . $apikey);
+$headerSignature = hash_hmac('sha256', $merchantCode . $timestamp , $apikey);
 $headers = array(
     'Content-Type: application/json',
     'x-duitku-signature: ' . $headerSignature,

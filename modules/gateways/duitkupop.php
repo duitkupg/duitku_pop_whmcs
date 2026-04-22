@@ -83,7 +83,7 @@ function duitkupop_link($params)
   $invoiceid = $params['invoiceid'];
   $currency = $params['currency'];
   $description = $params['description'];
-  $signature = hash("sha256", $merchantCode . $clientid . $invoiceid . $description . $secretKey);
+  $signature = hash_hmac("sha256", $merchantCode . $clientid . $invoiceid . $description , $secretKey);
   if ($environment == "sandbox") {
     $urllib = 'https://app-sandbox.duitku.com/lib/js/duitku.js';
   } elseif ($environment == "production") {
