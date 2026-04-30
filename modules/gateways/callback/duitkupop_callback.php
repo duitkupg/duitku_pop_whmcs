@@ -34,7 +34,7 @@ $reference = stripslashes($_POST['reference']);
 $callbackSignature = stripslashes($_POST['signature']);
 
 //validate incoming signature
-$validationSignature = md5($merchantCode . $amount . $orderId . $apikey);
+$validationSignature = hash_hmac("sha256", $merchantCode . $amount . $orderId , $apikey);
 if($callbackSignature !== $validationSignature){
 	logTransaction("duitkupop", $callbackSignature . " not equal with " .  $validationSignature, "Duitku Callback Signature Invalid");
 	header("HTTP/1.0 200 OK");
@@ -59,7 +59,7 @@ if ($currencyCurrent['code'] != 'IDR'){
 
 //check with duitku status
 $urlStat = $endpoint.'/api/merchant/transactionStatus';
-$signature = md5($merchantCode . $orderId . $apikey);
+$signature = hash_hmac("sha256", $merchantCode . $orderId , $apikey);
 $params = array(
 	'merchantCode' => $merchantCode,
 	'merchantOrderId' => $orderId,
